@@ -1,226 +1,138 @@
-# Openshift quickstart: Django
 
-This is a [Django](http://www.djangoproject.com) project that you can use as the starting point to develop your own and deploy it on an [OpenShift](https://github.com/openshift/origin) cluster.
+
+<!-- toc -->
+
+- [CakePHP Sample App on OpenShift](#cakephp-sample-app-on-openshift)
+  * [OpenShift Considerations](#openshift-considerations)
+    + [Security](#security)
+    + [Installation:](#installation)
+    + [Debugging Unexpected Failures](#debugging-unexpected-failures)
+    + [Installation: With MySQL](#installation-with-mysql)
+    + [Adding Webhooks and Making Code Changes](#adding-webhooks-and-making-code-changes)
+    + [Enabling the Database example](#enabling-the-database-example)
+    + [Hot Deploy](#hot-deploy)
+    + [Source repository layout](#source-repository-layout)
+    + [Compatibility](#compatibility)
+    + [License](#license)
+
+<!-- tocstop -->
+
+CakePHP Sample App on OpenShift
+===============================
+
+This is a quickstart CakePHP application for OpenShift v3 that you can use as a starting point to develop your own application and deploy it on an [OpenShift](https://github.com/openshift/origin) cluster.
+
+If you'd like to install it, follow [these directions](https://github.com/openshift/cakephp-ex/blob/master/README.md#installation).  
 
 The steps in this document assume that you have access to an OpenShift deployment that you can deploy applications on.
 
-## What has been done for you
+OpenShift Considerations
+------------------------
+These are some special considerations you may need to keep in mind when running your application on OpenShift.
 
-This is a minimal Django 1.8 project. It was created with these steps:
+### Security
+Since the quickstarts are shared code, we had to take special consideration to ensure that security related configuration variable values are unique across applications. To accomplish this, we modified some of the configuration files. Namely we changed Security.salt and Security.cipherSeed values in the app/Config/core.php config file. Those values are now generated from the application template as CAKEPHP_SECURITY_SALT and CAKEPHP_SECURITY_CIPHER_SEED. Also the secret token is generated in the template as CAKEPHP_SECRET_TOKEN. From these values the session hashes are generated. Now instead of using the same default values, OpenShift can generate these values using the generate from logic defined within the instant application's template.
 
-1. Create a virtualenv
-2. Manually install Django and other dependencies
-3. `pip freeze > requirements.txt`
-4. `django-admin startproject project .`
-3. Update `project/settings.py` to configure `SECRET_KEY`, `DATABASE` and `STATIC_ROOT` entries
-4. `./manage.py startapp welcome`, to create the welcome page's app
+### Installation:
+These steps assume your OpenShift deployment has the default set of ImageStreams defined.  Instructions for installing the default ImageStreams are available [here](https://docs.openshift.org/latest/install_config/imagestreams_templates.html#creating-image-streams-for-openshift-images).  If you are defining the set of ImageStreams now, remember to pass in the proper cluster-admin credentials and to create the ImageStreams in the 'openshift' namespace.
 
-From this initial state you can:
-* create new Django apps
-* remove the `welcome` app
-* rename the Django project
-* update settings to suit your needs
-* install more Python libraries and add them to the `requirements.txt` file
+1. Fork a copy of [cakephp-ex](https://github.com/openshift/cakephp-ex)
+2. Clone your repository to your development machine and cd to the repository directory
+3. Add a PHP application from the provided template and specify the source url to be your forked repo  
 
-## Special files in this repository
+		$ oc new-app openshift/templates/cakephp.json -p SOURCE_REPOSITORY_URL=<your repository location>
 
-Apart from the regular files created by Django (`project/*`, `welcome/*`, `manage.py`), this repository contains:
+4. Depending on the state of your system, and whether additional items need to be downloaded, it may take around a minute for your build to be started automatically.  If you do not want to wait, run
 
-```
-openshift/         - OpenShift-specific files
-├── scripts        - helper scripts
-└── templates      - application templates
+		$ oc start-build cakephp-example
 
-requirements.txt   - list of dependencies
-```
+5. Once the build is running, watch your build progress  
 
-## Warnings
+		$ oc logs build/cakephp-example-1
 
-Please be sure to read the following warnings and considerations before running this code on your local workstation, shared systems, or production environments.
+6. Wait for cakephp-example pods to start up (this can take a few minutes):  
 
-### Database configuration
+		$ oc get pods -w
 
-The sample application code and templates in this repository contain database connection settings and credentials that rely on being able to use sqlite.
 
-### Automatic test execution
+	Sample output:  
 
-The sample application code and templates in this repository contain scripts that automatically execute tests via the postCommit hook.  These tests assume that they are being executed against a local test sqlite database. If alternate database credentials are supplied to the build, the tests could make undesireable changes to that database.
+	       NAME                      READY     REASON         RESTARTS   AGE
+	       cakephp-example-1-build   0/1       ExitCode:0     0          8m
+	       cakephp-example-1-pytud   1/1       Running        0          2m
 
-## Local development
 
-To run this project in your development machine, follow these steps:
+7. Check the IP and port the cakephp-example service is running on:  
 
-1. (optional) Create and activate a [virtualenv](https://virtualenv.pypa.io/) (you may want to use [virtualenvwrapper](http://virtualenvwrapper.readthedocs.org/)).
+		$ oc get svc
 
-2. Ensure that the executable `pg_config` is available on your machine. You can check this using `which pg_config`. If not, install the dependency with one of the following.
-  - Mac OS X: `brew install postgresql` using [Homebrew](https://brew.sh/)
-  - Ubuntu: `sudo apt-get install libpq-dev`
-  - [Others](https://stackoverflow.com/a/12037133/8122577)
+	Sample output:  
 
-3. Fork this repo and clone your fork:
+	       NAME              LABELS                     SELECTOR               IP(S)           PORT(S)
+	       cakephp-example   template=cakephp-example   name=cakephp-example   172.30.97.123   8080/TCP
 
-    `git clone https://github.com/openshift/django-ex.git`
+In this case, the IP for cakephp-example is 172.30.97.123 and it is on port 8080.  
+*Note*: you can also get this information from the web console.
 
-4. Install dependencies:
+### Debugging Unexpected Failures
 
-    `pip install -r requirements.txt`
+Review some of the common tips and suggestions [here](https://github.com/openshift/origin/blob/master/docs/debugging-openshift.md).
 
-5. Create a development database:
+### Installation: With MySQL
+1. Follow the steps for the Manual Installation above for all but step 3, instead use step 2 below.  
+  - Note: The output in steps 5-6 may also display information about your database.
+2. Add a PHP application from the cakephp-mysql template and specify the source url to be your forked repo  
 
-    `./manage.py migrate`
+		$ oc new-app openshift/templates/cakephp-mysql.json -p SOURCE_REPOSITORY_URL=<your repository location>
 
-6. If everything is alright, you should be able to start the Django development server:
 
-    `./manage.py runserver`
+### Adding Webhooks and Making Code Changes
+Since OpenShift V3 does not provide a git repository out of the box, you can configure your github repository to make a webhook call whenever you push your code.
 
-7. Open your browser and go to http://127.0.0.1:8000, you will be greeted with a welcome page.
+1. From the Web Console homepage, navigate to your project
+2. Click on Browse > Builds
+3. Click the link with your BuildConfig name
+4. Click the Configuration tab
+5. Click the "Copy to clipboard" icon to the right of the "GitHub webhook URL" field
+6. Navigate to your repository on GitHub and click on repository settings > webhooks > Add webhook
+7. Paste your webhook URL provided by OpenShift
+8. Leave the defaults for the remaining fields - That's it!
+9. After you save your webhook, if you refresh your settings page you can see the status of the ping that Github sent to OpenShift to verify it can reach the server.  
 
+### Enabling the Database example
+In order to access the example CakePHP home page, which contains application stats including database connectivity, you have to go into the app/View/Layouts/ directory, remove the default.ctp and after that rename default.ctp.default into default.ctp`.
 
-## Deploying to OpenShift
+It will also be necessary to update your application to talk to your database back-end. The app/Config/database.php file used by CakePHP was set up in such a way that it will accept environment variables for your connection information that you pass to it. Once an administrator has created a MySQL database service for you to connect with you can add the following environment variables to your deploymentConfig to ensure all your cakephp-example pods have access to these environment variables. Note: the cakephp-mysql.json template creates the DB service and environment variables for you.
 
-To follow the next steps, you need to be logged in to an OpenShift cluster and have an OpenShift project where you can work on.
+You will then need to rebuild the application.  This is done via either a `oc start-build` command, or through the web console, or a webhook trigger in github initiating a build after the code changes are pushed.
 
+### Hot Deploy
 
-### Using an application template
+In order to immediately pick up changes made in your application source code, you need to run your built image with the `OPCACHE_REVALIDATE_FREQ=0` parameter to the [oc new-app](https://docs.openshift.org/latest/cli_reference/basic_cli_operations.html#basic-cli-operations) command, while performing the [installation steps](https://github.com/openshift/cakephp-ex#installation) described in this README.
 
-The directory `openshift/templates/` contains OpenShift application templates that you can add to your OpenShift project with:
+	$ oc new-app openshift/templates/cakephp-mysql.json -p OPCACHE_REVALIDATE_FREQ=0
 
-    oc create -f openshift/templates/<TEMPLATE_NAME>.json
+Hot deploy works out of the box in the php image used with this example.
 
-The template `django.json` contains just a minimal set of components to get your Django application into OpenShift.
+To change your source code in the running container you need to [oc rsh](https://docs.openshift.org/latest/cli_reference/basic_cli_operations.html#troubleshooting-and-debugging-cli-operations) into it.
 
-The template `django-postgresql.json` contains all of the components from `django.json`, plus a PostgreSQL database service and an Image Stream for the Python base image. For simplicity, the PostgreSQL database in this template uses ephemeral storage and, therefore, is not production ready.
+	$ oc rsh <POD_ID>
 
-After adding your templates, you can go to your OpenShift web console, browse to your project and click the create button. Create a new app from one of the templates that you have just added.
+After you [oc rsh](https://docs.openshift.org/latest/cli_reference/basic_cli_operations.html#troubleshooting-and-debugging-cli-operations) into the running container, your current directory is set to `/opt/app-root/src`, where the source code is located.
 
-Adjust the parameter values to suit your configuration. Most times you can just accept the default values, however you will probably want to set the `GIT_REPOSITORY` parameter to point to your fork and the `DATABASE_*` parameters to match your database configuration.
+### Source repository layout
 
-Alternatively, you can use the command line to create your new app, assuming your OpenShift deployment has the default set of ImageStreams defined.  Instructions for installing the default ImageStreams are available [here](https://docs.openshift.org/latest/install_config/imagestreams_templates.html).  If you are defining the set of ImageStreams now, remember to pass in the proper cluster-admin credentials and to create the ImageStreams in the 'openshift' namespace:
+You do not need to change anything in your existing PHP project's repository.
+However, if these files exist they will affect the behavior of the build process:
 
-    oc new-app openshift/templates/django.json -p SOURCE_REPOSITORY_URL=<your repository location>
+* **composer.json**
 
-Your application will be built and deployed automatically. If that doesn't happen, you can debug your build:
+  List of dependencies to be installed with `composer`. The format is documented
+  [here](https://getcomposer.org/doc/04-schema.md).
 
-    oc get builds
-    # take build name from the command above
-    oc logs build/<build-name>
+### Compatibility
 
-And you can see information about your deployment too:
+This repository is compatible with PHP 5.6 and higher, excluding any alpha or beta versions.
 
-    oc describe dc/django-example
-
-In the web console, the overview tab shows you a service, by default called "django-example", that encapsulates all pods running your Django application. You can access your application by browsing to the service's IP address and port.  You can determine these by running
-
-   oc get svc
-
-
-### Without an application template
-
-Templates give you full control of each component of your application.
-Sometimes your application is simple enough and you don't want to bother with templates. In that case, you can let OpenShift inspect your source code and create the required components automatically for you:
-
-```bash
-$ oc new-app centos/python-35-centos7~https://github.com/openshift/django-ex
-imageStreams/python-35-centos7
-imageStreams/django-ex
-buildConfigs/django-ex
-deploymentConfigs/django-ex
-services/django-ex
-A build was created - you can run `oc start-build django-ex` to start it.
-Service "django-ex" created at 172.30.16.213 with port mappings 8080.
-```
-
-You can access your application by browsing to the service's IP address and port.
-
-
-## Logs
-
-By default your Django application is served with gunicorn and configured to output its access log to stderr.
-You can look at the combined stdout and stderr of a given pod with this command:
-
-    oc get pods         # list all pods in your project
-    oc logs <pod-name>
-
-This can be useful to observe the correct functioning of your application.
-
-
-## Special environment variables
-
-### APP_CONFIG
-
-You can fine tune the gunicorn configuration through the environment variable `APP_CONFIG` that, when set, should point to a config file as documented [here](http://docs.gunicorn.org/en/latest/settings.html).
-
-### DJANGO_SECRET_KEY
-
-When using one of the templates provided in this repository, this environment variable has its value automatically generated. For security purposes, make sure to set this to a random string as documented [here](https://docs.djangoproject.com/en/1.8/ref/settings/#std:setting-SECRET_KEY).
-
-
-## One-off command execution
-
-At times you might want to manually execute some command in the context of a running application in OpenShift.
-You can drop into a Python shell for debugging, create a new user for the Django Admin interface, or perform any other task.
-
-You can do all that by using regular CLI commands from OpenShift.
-To make it a little more convenient, you can use the script `openshift/scripts/run-in-container.sh` that wraps some calls to `oc`.
-In the future, the `oc` CLI tool might incorporate changes
-that make this script obsolete.
-
-Here is how you would run a command in a pod specified by label:
-
-1. Inspect the output of the command below to find the name of a pod that matches a given label:
-
-        oc get pods -l <your-label-selector>
-
-2. Open a shell in the pod of your choice. Because of how the images produced
-  with CentOS and RHEL work currently, we need to wrap commands with `bash` to
-  enable any Software Collections that may be used (done automatically inside
-  every bash shell).
-
-        oc exec -p <pod-name> -it -- bash
-
-3. Finally, execute any command that you need and exit the shell.
-
-Related GitHub issues:
-1. https://github.com/GoogleCloudPlatform/kubernetes/issues/8876
-2. https://github.com/openshift/origin/issues/2001
-
-
-The wrapper script combines the steps above into one. You can use it like this:
-
-    ./run-in-container.sh ./manage.py migrate          # manually migrate the database
-                                                       # (done for you as part of the deployment process)
-    ./run-in-container.sh ./manage.py createsuperuser  # create a user to access Django Admin
-    ./run-in-container.sh ./manage.py shell            # open a Python shell in the context of your app
-
-If your Django pods are labeled with a name other than "django", you can use:
-
-    POD_NAME=name ./run-in-container.sh ./manage.py check
-
-If there is more than one replica, you can also specify a POD by index:
-
-    POD_INDEX=1 ./run-in-container.sh ./manage.py shell
-
-Or both together:
-
-    POD_NAME=django-example POD_INDEX=2 ./run-in-container.sh ./manage.py shell
-
-
-## Data persistence
-
-You can deploy this application without a configured database in your OpenShift project, in which case Django will use a temporary SQLite database that will live inside your application's container, and persist only until you redeploy your application.
-
-After each deploy you get a fresh, empty, SQLite database. That is fine for a first contact with OpenShift and perhaps Django, but sooner or later you will want to persist your data across deployments.
-
-To do that, you should add a properly configured database server or ask your OpenShift administrator to add one for you. Then use `oc env` to update the `DATABASE_*` environment variables in your DeploymentConfig to match your database settings.
-
-Redeploy your application to have your changes applied, and open the welcome page again to make sure your application is successfully connected to the database server.
-
-
-## Looking for help
-
-If you get stuck at some point, or think that this document needs further details or clarification, you can give feedback and look for help using the channels mentioned in [the OpenShift Origin repo](https://github.com/openshift/origin), or by filing an issue.
-
-
-## License
-
+### License
 This code is dedicated to the public domain to the maximum extent permitted by applicable law, pursuant to [CC0](http://creativecommons.org/publicdomain/zero/1.0/).
